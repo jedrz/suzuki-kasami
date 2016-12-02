@@ -9,16 +9,17 @@
             [taoensso.timbre :as log])
   (:gen-class))
 
-(def resource (atom 0))
+(def resource-value (atom 0))
+(def resource-blocked? (atom false))
 
 (defn read-resource-handler
   [req]
   (log/info "Read value")
-  (response {:value @resource}))
+  (response {:value @resource-value}))
 
 (def ok {:status 200})
 (def bad-request {:status 400})
-(def confict {:status 409})
+(def conflict {:status 409})
 
 (defn valid-value?
   [value]
@@ -36,20 +37,41 @@
     (if new-value
       (do
         (log/info "Set value to" new-value)
-        (reset! resource new-value)
+        (reset! resource-value new-value)
         ok)
       bad-request)))
 
-(defn delayed-handler
+(defn run-and-release-resource
+  [func]
+  (log/info "Resource acquired")
+  (try
+    (func)
+    (finally
+      (reset! resource-blocked? false)
+      (log/info "Resource released"))))
+
+(defn protecting-resource-handler
+  [orig-handler]
+  (fn [req]
+    (log/info "Trying to acquire resource")
+    (if (compare-and-set! resource-blocked? false true)
+      (run-and-release-resource #(orig-handler req))
+      (do
+        (log/warn "Resource already locked!")
+        conflict))))
+
+(defn delaying-handler
   [orig-handler]
   (fn [req]
     (d/future
+      (log/info "Delaying")
       (Thread/sleep 5000)
       (orig-handler req))))
 
 (defroutes routes
-  (GET "/" [] read-resource-handler)
-  (POST "/" [] (delayed-handler set-resource-handler))
+  (GET "/" [] (protecting-resource-handler read-resource-handler))
+  (POST "/" [] (protecting-resource-handler
+                (delaying-handler set-resource-handler)))
   (route/not-found "No such page."))
 
 (def handler
@@ -59,6 +81,8 @@
 
 (defn -main
   [& args]
+  (log/merge-config!
+   {:output-fn (partial log/default-output-fn {:pattern "yy-MM-dd HH:mm:ss:SSS"})})
   (log/info "Starting resource server")
   (let [server (http/start-server handler {:port 8080})]
     (netty/wait-for-close server)))
