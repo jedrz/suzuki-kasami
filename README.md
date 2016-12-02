@@ -4,4 +4,4 @@
 
 ### Resource server
 
-   lein with-profile resource-server run
+    lein with-profile resource-server run
