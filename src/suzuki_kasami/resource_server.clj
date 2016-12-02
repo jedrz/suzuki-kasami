@@ -61,12 +61,19 @@
         (log/warn "Resource already locked!")
         conflict))))
 
+(defn random-sleep
+  []
+  (Thread/sleep
+   (+ 3000
+      (rand-int 10))))
+
 (defn delaying-handler
   [orig-handler]
   (fn [req]
     (d/future
       (log/info "Delaying")
-      (Thread/sleep 5000)
+      (random-sleep)
+      (log/info "Finished delaying")
       (orig-handler req))))
 
 (defroutes routes
