@@ -66,7 +66,7 @@
   []
   (Thread/sleep
    (+ 3000
-      (rand-int 5))))
+      (rand-int 5000))))
 
 (defn delaying-handler
   [orig-handler]
