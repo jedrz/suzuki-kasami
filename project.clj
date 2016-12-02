@@ -10,6 +10,7 @@
                  [ring/ring-json "0.4.0"]
                  [com.taoensso/timbre "4.7.4"]
                  [environ "1.0.0"]]
+  :min-lein-version "2.6.1"
   :aot [suzuki-kasami.resource-server suzuki-kasami.node]
   :target-path "target/%s"
   :profiles {:resource-server {:main suzuki-kasami.resource-server
