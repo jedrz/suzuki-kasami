@@ -87,10 +87,13 @@
       wrap-json-response
       wrap-json-body))
 
+(defn configure-logging
+  []
+  (log/merge-config! {:timestamp-opts {:pattern "yy-MM-dd HH:mm:ss:SSS"}}))
+
 (defn -main
   [& args]
-  (log/merge-config!
-   {:output-fn (partial log/default-output-fn {:pattern "yy-MM-dd HH:mm:ss:SSS"})})
+  (configure-logging)
   (log/info "Starting resource server")
   (let [server (http/start-server handler {:port 8080})]
     (netty/wait-for-close server)))
