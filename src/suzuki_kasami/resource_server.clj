@@ -41,21 +41,22 @@
         ok)
       bad-request)))
 
+(defn release-resource
+  []
+  (reset! resource-blocked? false)
+  (log/info "Resource released"))
+
 (defn run-and-release-resource
-  [func]
+  [d]
   (log/info "Resource acquired")
-  (try
-    (func)
-    (finally
-      (reset! resource-blocked? false)
-      (log/info "Resource released"))))
+  (d/finally d release-resource))
 
 (defn protecting-resource-handler
   [orig-handler]
   (fn [req]
     (log/info "Trying to acquire resource")
     (if (compare-and-set! resource-blocked? false true)
-      (run-and-release-resource #(orig-handler req))
+      (run-and-release-resource (orig-handler req))
       (do
         (log/warn "Resource already locked!")
         conflict))))
