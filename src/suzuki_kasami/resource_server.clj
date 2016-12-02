@@ -6,7 +6,8 @@
             [compojure.route :as route]
             [ring.util.response :refer [response]]
             [ring.middleware.json :refer [wrap-json-response wrap-json-body]]
-            [taoensso.timbre :as log])
+            [taoensso.timbre :as log]
+            [environ.core :refer [env]])
   (:gen-class))
 
 (def resource-value (atom 0))
@@ -95,5 +96,6 @@
   [& args]
   (configure-logging)
   (log/info "Starting resource server")
-  (let [server (http/start-server handler {:port 8080})]
+  (let [port (Integer. (env :port 8080))
+        server (http/start-server handler {:port port})]
     (netty/wait-for-close server)))
