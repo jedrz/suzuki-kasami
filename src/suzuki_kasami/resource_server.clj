@@ -34,13 +34,12 @@
 
 (defn set-resource-handler
   [req]
-  (let [new-value (get-value-from-req req)]
-    (if new-value
-      (do
-        (log/info "Set value to" new-value)
-        (reset! resource-value new-value)
-        ok)
-      bad-request)))
+  (if-let [new-value (get-value-from-req req)]
+    (do
+      (log/info "Set value to" new-value)
+      (reset! resource-value new-value)
+      ok)
+    bad-request))
 
 (defn release-resource
   []
