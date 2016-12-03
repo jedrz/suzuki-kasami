@@ -9,7 +9,9 @@
                  [compojure "1.4.0"]
                  [ring/ring-json "0.4.0"]
                  [com.taoensso/timbre "4.7.4"]
-                 [environ "1.0.0"]]
+                 [environ "1.0.0"]
+                 [ring-logger-timbre "0.7.5"]
+                 [ring.middleware.conditional "0.2.0"]]
   :min-lein-version "2.6.1"
   :aot [suzuki-kasami.resource-server suzuki-kasami.node]
   :target-path "target/%s"

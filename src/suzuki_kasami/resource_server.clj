@@ -7,6 +7,8 @@
             [ring.util.response :refer [response]]
             [ring.middleware.json :refer [wrap-json-response wrap-json-body]]
             [taoensso.timbre :as log]
+            [ring.logger.timbre :as logger.timbre]
+            [ring.middleware.conditional :as c]
             [environ.core :refer [env]])
   (:gen-class))
 
@@ -76,16 +78,25 @@
       (log/info "Finished delaying")
       (orig-handler req))))
 
+(defn if-method-matches
+  [orig-handler method if-matches-handler]
+  (c/if orig-handler
+        #(= (:request-method %) method)
+        if-matches-handler))
+
 (defroutes routes
   (GET "/" [] (protecting-resource-handler read-resource-handler))
-  (POST "/" [] (protecting-resource-handler
-                (delaying-handler set-resource-handler)))
+  (POST "/" [] (-> set-resource-handler
+                   delaying-handler
+                   protecting-resource-handler))
   (route/not-found "No such page."))
 
 (def handler
   (-> routes
       wrap-json-response
-      wrap-json-body))
+      wrap-json-body
+      logger.timbre/wrap-with-logger
+      (if-method-matches :post logger.timbre/wrap-with-body-logger)))
 
 (defn configure-logging
   []
