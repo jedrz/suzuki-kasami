@@ -6,6 +6,7 @@
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [aleph "0.4.2-alpha10"]
                  [manifold "0.1.5"]
+                 [gloss "0.2.6"]
                  [compojure "1.4.0"]
                  [ring/ring-json "0.4.0"]
                  [com.taoensso/timbre "4.7.4"]
