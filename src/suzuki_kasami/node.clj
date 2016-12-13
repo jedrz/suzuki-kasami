@@ -17,17 +17,38 @@
 
 (defn handle-message
   [msg]
-  (log/info "Got message" (String. msg)))
+  (log/info "Got message" msg))
 
-(defn handler
-  [s info]
-  (log/info "New connection" info)
+(defn message-handler
+  [s]
   (d/chain
    (s/take! s)
    (fn [msg]
      ;; Close the connection after receiving a message.
+     (log/info "Hmm")
      (s/close! s)
      (d/future (handle-message msg)))))
+
+(defn wrap-with-protocol
+  [s]
+  (let [out (s/stream)]
+    (s/connect
+     (s/map #(io/encode protocol %) out)
+     s)
+    (s/splice
+     out
+     (io/decode-stream s protocol))))
+
+(defn handler
+  [s info]
+  (log/info "New connection" info)
+  (message-handler (wrap-with-protocol s)))
+
+(defn client
+  [& {:keys [host port]}]
+  (d/chain
+   (tcp/client {:host host :port port})
+   wrap-with-protocol))
 
 (defn start-server
   [options]
