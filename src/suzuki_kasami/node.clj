@@ -25,7 +25,6 @@
    (s/take! s)
    (fn [msg]
      ;; Close the connection after receiving a message.
-     (log/info "Hmm")
      (s/close! s)
      (d/future (handle-message msg)))))
 
