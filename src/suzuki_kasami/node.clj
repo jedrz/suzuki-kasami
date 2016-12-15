@@ -7,20 +7,27 @@
    [gloss.core :as gloss]
    [gloss.io :as io]
    [cheshire.core :as cheshire]
-   [aleph.netty :as netty])
+   [aleph.netty :as netty]
+   [aleph.http :as http]
+   [ring.middleware.json :refer [wrap-json-response wrap-json-body]]
+   [compojure.core :refer [defroutes POST]])
   (:gen-class))
 
 (def configuration (atom {}))
 
-(def protocol
-  (gloss/compile-frame
-   (gloss/string :utf-8)
-   cheshire/generate-string
-   cheshire/parse-string))
-
 (defn handle-message
   [msg]
   (log/info "Got message" msg))
+
+(defn start-election
+  []
+  (log/info "Staring election")
+  {:status 200})
+
+(defn modify-resource
+  [value]
+  (log/info "Modifying resource with value" value)
+  {:status 200})
 
 (defn message-handler
   [s]
@@ -30,6 +37,12 @@
      ;; Close the connection after receiving a message.
      (s/close! s)
      (d/future (handle-message msg)))))
+
+(def protocol
+  (gloss/compile-frame
+   (gloss/string :utf-8)
+   cheshire/generate-string
+   cheshire/parse-string))
 
 (defn wrap-with-protocol
   [s]
@@ -62,6 +75,22 @@
   (let [server (start-server (select-keys configuration [:port]))]
     (netty/wait-for-close server)))
 
+(defroutes admin-routes
+  (POST "/election" [] (fn [req] (start-election)))
+  (POST "/resource" [] (fn [req] (modify-resource
+                                  (get-in req [:body "value"] 0)))))
+
+(def admin-handler
+  (-> admin-routes
+      wrap-json-response
+      wrap-json-body))
+
+(defn start-admin-server
+  [configuration]
+  (let [port (:admin-port configuration)]
+    (log/info "Starting admin server on port" port)
+    (http/start-server admin-handler {:port port})))
+
 (defn -main
   [& args]
   (log/info "Starting node with configuration" args)
@@ -69,4 +98,5 @@
         conf (clojure.edn/read-string (slurp conf-path))]
     (log/info "Read configuration" conf)
     (reset! configuration conf)
+    (start-admin-server conf)
     (start-server-and-wait conf)))
