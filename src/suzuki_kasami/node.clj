@@ -1,13 +1,16 @@
 (ns suzuki-kasami.node
-   (:require
-    [manifold.deferred :as d]
-    [manifold.stream :as s]
-    [aleph.tcp :as tcp]
-    [taoensso.timbre :as log]
-    [gloss.core :as gloss]
-    [gloss.io :as io]
-    [cheshire.core :as cheshire])
-   (:gen-class))
+  (:require
+   [manifold.deferred :as d]
+   [manifold.stream :as s]
+   [aleph.tcp :as tcp]
+   [taoensso.timbre :as log]
+   [gloss.core :as gloss]
+   [gloss.io :as io]
+   [cheshire.core :as cheshire]
+   [aleph.netty :as netty])
+  (:gen-class))
+
+(def configuration (atom {}))
 
 (def protocol
   (gloss/compile-frame
@@ -51,8 +54,19 @@
 
 (defn start-server
   [options]
+  (log/info "Starting tcp server with options" options)
   (tcp/start-server handler options))
+
+(defn- start-server-and-wait
+  [configuration]
+  (let [server (start-server (select-keys configuration [:port]))]
+    (netty/wait-for-close server)))
 
 (defn -main
   [& args]
-  (println "Node"))
+  (log/info "Starting node with configuration" args)
+  (let [conf-path (first args)
+        conf (clojure.edn/read-string (slurp conf-path))]
+    (log/info "Read configuration" conf)
+    (reset! configuration conf)
+    (start-server-and-wait conf)))

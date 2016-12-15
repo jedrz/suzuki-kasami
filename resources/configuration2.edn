@@ -1,0 +1,4 @@
+{:id 2
+ :port 8082
+ :nodes [{:id 1 :host "localhost" :port 8081}
+         {:id 3 :host "localhost" :port 8083}]}
