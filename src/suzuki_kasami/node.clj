@@ -13,7 +13,7 @@
    [compojure.core :refer [defroutes POST]])
   (:gen-class))
 
-(def configuration (atom {}))
+(def configuration)
 
 (defn handle-message
   [msg]
@@ -97,6 +97,6 @@
   (let [conf-path (first args)
         conf (clojure.edn/read-string (slurp conf-path))]
     (log/info "Read configuration" conf)
-    (reset! configuration conf)
+    (alter-var-root #'configuration conf)
     (start-admin-server conf)
     (start-server-and-wait conf)))
