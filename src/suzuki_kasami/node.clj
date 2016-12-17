@@ -29,38 +29,36 @@
   (let [node (first (filter #(= (:id %) id) (:nodes configuration)))]
     (client :host (:host node) :port (:port node))))
 
-(defn build-send-fn
-  []
-  (fn [id msg]
-    (log/info "Sending to node" id "msg" msg)
-    @(d/chain
-      (create-client id)
-      (fn [s]
-        (s/put! s msg)))))
+(defn send-fn
+  [id msg]
+  (log/info "Sending to node" id "msg" msg)
+  @(d/chain
+    (create-client id)
+    (fn [s]
+      (s/put! s msg)
+      (s/close! s))))
+
+(defn handle-election
+  [election-fn]
+  (let [action
+        (dosync
+         (let [{:keys [state action]} (election-fn @election-state)]
+           (ref-set election-state state)
+           action))]
+    (log/info "New election state" @election-state)
+    (action send-fn)))
 
 (defn handle-message
   [msg]
   (log/info "Got message" msg)
-  (let [action
-        (dosync
-         (let [{:keys [state action]}
-               (election/handle-message @election-state msg)]
-           (ref-set election-state state)
-           action))]
-    (log/info "New election state after msg" @election-state)
-    (action (build-send-fn))))
+  (cond
+    (election/election-msg? msg) (handle-election
+                                  #(election/handle-message % msg))))
 
 (defn start-election
   []
   (log/info "Staring election")
-  (let [action
-        (dosync
-         (let [{:keys [state action]}
-               (election/start-election @election-state)]
-           (ref-set election-state state)
-           action))]
-    (log/info "New election state after start" @election-state)
-    (action (build-send-fn)))
+  (handle-election election/start-election)
   {:status 200})
 
 (defn modify-resource

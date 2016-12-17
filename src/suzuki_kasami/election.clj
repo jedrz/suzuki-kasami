@@ -23,6 +23,10 @@
   [msg]
   (= (get msg "type") ok-msg-type))
 
+(defn election-msg?
+  [msg]
+  ((some-fn broadcast-msg? ok-msg?) msg))
+
 (defn initial-state
   [sender nodes]
   {:elected false
@@ -35,6 +39,7 @@
   (fn [send-fn]
     (doseq [node (:nodes state)]
       (let [sender (:sender state)]
+        ;; TODO: don't sent broadcast to confirmed nodes.
         (send-fn node
                  (construct-broadcast-msg :sender sender :node sender))))))
 
@@ -50,6 +55,7 @@
 
 (defn start-election
   [state]
+  (log/info "Start election")
   {:state state
    :action (send-broadcast state)})
 
@@ -60,11 +66,13 @@
 
 (defn respond-ok
   [state msg]
+  (log/info "Respond ok")
   {:state state
    :action (send-ok state msg)})
 
 (defn handle-broadcast
   [state msg]
+  (log/info "Handle broadcast" state msg)
   (if (other-stronger? state msg)
     (respond-ok state msg)
     (start-election state)))
@@ -83,6 +91,7 @@
 
 (defn handle-ok
   [state msg]
+  (log/info "Handle ok" state msg)
   (let [new-state (-> state
                       (extend-confirmations msg)
                       (update-elected msg))]
