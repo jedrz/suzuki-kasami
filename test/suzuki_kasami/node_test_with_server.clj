@@ -42,3 +42,5 @@
           @(s/put! c expected-msg)
 
           (is (= @received-msg expected-msg)))))))
+
+(alter-var-root #'*load-tests* (constantly true))
