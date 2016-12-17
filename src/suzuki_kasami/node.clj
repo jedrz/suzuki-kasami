@@ -24,6 +24,8 @@
 
 (def election-state (ref {}))
 
+(def suzuki-kasami-state (ref {}))
+
 (defn create-client
   [id]
   (let [node (first (filter #(= (:id %) id) (:nodes configuration)))]
@@ -64,8 +66,7 @@
 (defn modify-resource
   [value]
   (log/info "Modifying resource with value" value)
-  (dosync
-   (election/start-election ))
+  ;; TODO:
   {:status 200})
 
 (defn message-handler
