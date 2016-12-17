@@ -29,7 +29,8 @@
 
 (defn initial-state
   [sender nodes]
-  {:elected false
+  {:finished false
+   :elected false
    :sender sender
    :confirmations #{}
    :nodes (into #{} nodes)})
@@ -67,7 +68,7 @@
 (defn respond-ok
   [state msg]
   (log/info "Respond ok")
-  {:state state
+  {:state (assoc state :finished true)
    :action (send-ok state msg)})
 
 (defn handle-broadcast
@@ -86,8 +87,8 @@
   [state msg]
   (log/info "Update elected" state msg)
   (assoc state
-         :elected
-         (= (:confirmations state) (:nodes state))))
+         :elected (= (:confirmations state) (:nodes state))
+         :finished true))
 
 (defn handle-ok
   [state msg]
