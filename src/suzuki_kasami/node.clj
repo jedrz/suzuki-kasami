@@ -10,23 +10,64 @@
    [aleph.netty :as netty]
    [aleph.http :as http]
    [ring.middleware.json :refer [wrap-json-response wrap-json-body]]
-   [compojure.core :refer [defroutes POST]])
+   [compojure.core :refer [defroutes POST]]
+   [suzuki-kasami.election :as election])
   (:gen-class))
+
+(declare client)
+
+(defn extract-ids
+  [c]
+  (map :id (:nodes c)))
 
 (def configuration)
 
+(def election-state (ref {}))
+
+(defn create-client
+  [id]
+  (let [node (first (filter #(= (:id %) id) (:nodes configuration)))]
+    (client :host (:host node) :port (:port node))))
+
+(defn build-send-fn
+  []
+  (fn [id msg]
+    (log/info "Sending to node" id "msg" msg)
+    @(d/chain
+      (create-client id)
+      (fn [s]
+        (s/put! s msg)))))
+
 (defn handle-message
   [msg]
-  (log/info "Got message" msg))
+  (log/info "Got message" msg)
+  (let [action
+        (dosync
+         (let [{:keys [state action]}
+               (election/handle-message @election-state msg)]
+           (ref-set election-state state)
+           action))]
+    (log/info "New election state after msg" @election-state)
+    (action (build-send-fn))))
 
 (defn start-election
   []
   (log/info "Staring election")
+  (let [action
+        (dosync
+         (let [{:keys [state action]}
+               (election/start-election @election-state)]
+           (ref-set election-state state)
+           action))]
+    (log/info "New election state after start" @election-state)
+    (action (build-send-fn)))
   {:status 200})
 
 (defn modify-resource
   [value]
   (log/info "Modifying resource with value" value)
+  (dosync
+   (election/start-election ))
   {:status 200})
 
 (defn message-handler
@@ -97,6 +138,9 @@
   (let [conf-path (first args)
         conf (clojure.edn/read-string (slurp conf-path))]
     (log/info "Read configuration" conf)
-    (alter-var-root #'configuration conf)
+    (alter-var-root #'configuration (fn [& args] conf))
+    (dosync
+     (ref-set election-state
+              (election/initial-state (:id conf) (extract-ids conf))))
     (start-admin-server conf)
     (start-server-and-wait conf)))

@@ -14,3 +14,15 @@
            {"senderId" 5
             "type" "electionOk"}))))
 
+(deftest handle-msg
+
+  (testing "choosing handle fn for broadcast"
+    (let [msg (sut/construct-broadcast-msg :sender 1 :node 2)]
+      (is (= (sut/choose-handle-fn msg)
+             sut/handle-broadcast))))
+
+  (testing "choosing handle fn for ok"
+    (let [msg (sut/construct-ok-msg :sender 1 :node 2)]
+      (is (= (sut/choose-handle-fn msg)
+             sut/handle-ok)))))
+
