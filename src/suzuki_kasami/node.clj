@@ -155,15 +155,14 @@
   [key watchee old-value new-value]
   (dosync
    (cond
-     (and (:elected new-value)
-          (:finished new-value)) (ref-set
-                                  sk-state
-                                  (sk/initial-state-with-token (:id configuration)
-                                                               (extract-ids configuration)))
-     (:finished new-value) (ref-set
-                            sk-state
-                            (sk/initial-state (:id configuration)
-                                              (extract-ids configuration))))))
+     (election/elected? new-value) (ref-set
+                                    sk-state
+                                    (sk/initial-state-with-token (:id configuration)
+                                                                 (extract-ids configuration)))
+     (election/finished?) (ref-set
+                           sk-state
+                           (sk/initial-state (:id configuration)
+                                             (extract-ids configuration))))))
 
 (defn modify-external-resource
   [value]

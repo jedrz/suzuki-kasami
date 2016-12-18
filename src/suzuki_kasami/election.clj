@@ -108,3 +108,11 @@
 (defn handle-message
   [state msg]
   ((choose-handle-fn msg) state msg))
+
+(defn elected?
+  [state]
+  (:elected state))
+
+(defn finished?
+  [state]
+  (:finished state))
