@@ -143,6 +143,10 @@
                                    (:requests state)
                                    (get-in state [:token :last-requests]))))
 
+(defn mark-cs-left
+  [state]
+  (assoc state :critical-section? false))
+
 (defn first-from-queue
   [state]
   (get-in state [:token :queue 0]))
@@ -174,7 +178,8 @@
   (log/info "Release critical section" state)
   (let [new-state (-> state
                       request-number-from-state-to-token
-                      update-queue)
+                      update-queue
+                      mark-cs-left)
         new-token-owner (first-from-queue new-state)
         state-with-shorter-queue (drop-first-from-queue new-state)]
     {:state (maybe-dissoc-token state-with-shorter-queue new-token-owner)
