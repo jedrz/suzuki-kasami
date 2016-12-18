@@ -11,6 +11,14 @@
   [msg]
   (= (get msg "type") "request"))
 
+(defn sender-from-request
+  [msg]
+  (get msg "senderId"))
+
+(defn request-number-from-msg
+  [msg]
+  (get-in msg ["value" "requestNumber"]))
+
 (defn- requests->messaged
   [requests]
   (map (fn [[id number]]
@@ -55,6 +63,19 @@
   {:last-requests (nodes->requests (conj-nodes-and-sender nodes sender))
    :queue []})
 
+(defn requests->unmessaged
+  [requests]
+  (->> requests
+       (map (fn [entry]
+              [(get entry "nodeId")
+               (get entry "number")]))
+       (into {})))
+
+(defn token-from-msg
+  [msg]
+  {:last-requests (requests->unmessaged (get-in msg ["value" "lastRequests"]))
+   :queue ( (get-in msg ["value" "queue"]))})
+
 (defn initial-state-with-token
   [sender nodes token]
   (assoc (initial-state sender nodes)
@@ -85,3 +106,124 @@
   (let [new-state (inc-sender-request-number state)]
     {:state new-state
      :action (send-request new-state)}))
+
+(declare request-number-from-state)
+
+(defn request-number-from-state-to-token
+  [state]
+  (assoc-in state
+            [:token :last-requests state]
+            (request-number-from-state state (:sender state))))
+
+(declare outstanding-request?)
+
+(defn update-queue-itself
+  [queue requests last-requests]
+  (let [all-nodes (keys requests)
+        not-in-queue (clojure.set/difference (set all-nodes) (set queue))]
+    (reduce (fn [q n]
+              (if (outstanding-request? requests last-requests n)
+                (conj q n)
+                q))
+            queue
+            not-in-queue)))
+
+(defn update-queue
+  [state]
+  (update-in state
+             [:token :queue]
+             #(update-queue-itself %
+                                   (:requests state)
+                                   (get-in state [:token :last-requests]))))
+
+(defn first-from-queue
+  [state]
+  (get-in state [:token :queue 0]))
+
+(defn drop-first-from-queue
+  [state]
+  (update-in state
+             [:token :queue]
+             #(into [] (rest %))))
+
+(defn send-token
+  [token new-owner sender]
+  (fn [send-fn]
+    (send-fn new-owner
+             (construct-token-msg :sender sender :token token))))
+
+(defn release-critical-section
+  [state]
+  (log/info "Release critical section" state)
+  (let [new-state (-> state
+                      request-number-from-state-to-token
+                      update-queue)
+        new-token-owner (first-from-queue new-state)
+        state-with-shorter-queue (drop-first-from-queue new-state)]
+    {:state (dissoc state-with-shorter-queue :token)
+     :action (send-token (:token state-with-shorter-queue)
+                         new-token-owner
+                         (:sender state))}))
+
+(defn update-request-number
+  [state msg]
+  (let [msg-sender (sender-from-request msg)
+        number-from-msg (request-number-from-msg msg)]
+    (update-in state
+               [:requests msg-sender]
+               #(max % number-from-msg))))
+
+(defn request-number-from-state
+  [state id]
+  (get-in state [:requests id]))
+
+(defn request-number-from-token
+  [token id]
+  (get-in token [:last-requests id]))
+
+(defn outstanding-request?
+  ([state id]
+   (outstanding-request? (:requests state)
+                         (get-in state [:token :last-requests])
+                         id))
+  ([requests last-requests id]
+   (= (get requests id)
+      (inc (get last-requests id)))))
+
+(defn release-token-on-request?
+  [state msg]
+  (and
+   (contains? state :token)
+   (not (:critical-section? state))
+   (outstanding-request? state (sender-from-request msg))))
+
+(defn maybe-release-token
+  [state request-msg]
+  (fn [send-fn]
+    (when (release-token-on-request? state request-msg)
+      (log/info "Releasing token on request")
+      (send-fn (sender-from-request request-msg)
+               (construct-token-msg (:sender state) (:token state))))))
+
+(defn handle-request
+  [state msg]
+  (log/info "Handle request" state msg)
+  (let [new-state (update-request-number state msg)]
+    {:state new-state
+     :action (maybe-release-token)}))
+
+(defn handle-token
+  [state msg]
+  (log/info "Handle token" state msg)
+  {:state (assoc state :token (token-from-msg msg))
+   :action (fn [& _])})
+
+(defn choose-handle-fn
+  [msg]
+  (cond
+    (request-msg? msg) handle-request
+    (token-msg? msg) handle-token))
+
+(defn handle-message
+  [state msg]
+  (choose-handle-fn msg) state msg)

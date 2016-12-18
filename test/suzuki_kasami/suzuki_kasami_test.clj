@@ -66,4 +66,15 @@
           inc-state (sut/inc-sender-request-number
                      (sut/inc-sender-request-number state))]
       (is (= (sut/sender-request-number inc-state)
-             2)))))
+             2))))
+
+  (testing "updating request number from message"
+    (let [state (sut/initial-state 2 [1 3 4])
+          msg (sut/construct-request-msg :sender 3 :request-number 4)
+          new-state (sut/update-request-number state msg)]
+      (is (= (get-in new-state [:requests 3])
+             4))))
+
+  (testing "ignoring update request number from message if lower than in state"
+    ;; TODO:
+    ))
