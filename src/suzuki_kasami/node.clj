@@ -160,12 +160,12 @@
      (election/elected?
       state) (ref-set
               sk-state
-              (sk/initial-state-with-token (:id configuration)
+              (sk/initial-state-with-token (:me configuration)
                                            (extract-ids configuration)))
      (election/finished?
       state) (ref-set
               sk-state
-              (sk/initial-state (:id configuration)
+              (sk/initial-state (:me configuration)
                                 (extract-ids configuration))))))
 
 (defn modify-external-resource
@@ -195,6 +195,6 @@
     (alter-var-root #'configuration (fn [& args] conf))
     (dosync
      (ref-set election-state
-              (election/initial-state (:id conf) (extract-ids conf))))
+              (election/initial-state (:me conf) (extract-ids conf))))
     (start-admin-server conf)
     (start-server-and-wait conf)))

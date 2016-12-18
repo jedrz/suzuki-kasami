@@ -1,4 +1,4 @@
-{:id 2
+{:me 2
  :port 8082
  :admin-port 8182
  :nodes [{:id 1 :host "localhost" :port 8081}
