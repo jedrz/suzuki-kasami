@@ -186,7 +186,7 @@
       (handle-sk sk/enter-critical-section)
       (modify-external-resource @modify-resource-value)
       (handle-sk sk/release-critical-section)
-      (reset! modify-resource-value false)
+      (reset! modify-resource-value nil)
       (log/info "Finished modifying resource"))))
 
 (defn -main
