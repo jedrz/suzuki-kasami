@@ -11,7 +11,8 @@
    [aleph.http :as http]
    [ring.middleware.json :refer [wrap-json-response wrap-json-body]]
    [compojure.core :refer [defroutes POST]]
-   [suzuki-kasami.election :as election])
+   [suzuki-kasami.election :as election]
+   [suzuki-kasami.suzuki-kasami :as sk])
   (:gen-class))
 
 (declare client)
@@ -24,7 +25,7 @@
 
 (def election-state (ref {}))
 
-(def suzuki-kasami-state (ref {}))
+(def sk-state (ref {}))
 
 (defn create-client
   [id]
@@ -50,12 +51,24 @@
     (log/info "New election state" @election-state)
     (action send-fn)))
 
+(defn handle-sk
+  [sk-fn]
+  (let [action
+        (dosync
+         (let [{:keys [state action]} (sk-fn @sk-state)]
+           (ref-set sk-state state)
+           action))]
+    (log/info "New sk state" @sk-state)
+    (action send-fn)))
+
 (defn handle-message
   [msg]
   (log/info "Got message" msg)
   (cond
     (election/election-msg? msg) (handle-election
-                                  #(election/handle-message % msg))))
+                                  #(election/handle-message % msg))
+    (sk/sk-msg? msg) (handle-sk
+                      #(sk/handle-message % msg))))
 
 (defn start-election
   []
@@ -66,7 +79,7 @@
 (defn modify-resource
   [value]
   (log/info "Modifying resource with value" value)
-  ;; TODO:
+  (handle-sk sk/request-critical-section)
   {:status 200})
 
 (defn message-handler
@@ -131,6 +144,24 @@
     (log/info "Starting admin server on port" port)
     (http/start-server admin-handler {:port port})))
 
+(defn election-state-watcher
+  [key watchee old-value new-value]
+  (dosync
+   (cond
+     (and (:elected new-value)
+          (:finished new-value)) (ref-set
+                                  sk-state
+                                  (sk/initial-state-with-token (:id configuration)
+                                                               (extract-ids configuration)))
+     (:finished new-value) (ref-set
+                            sk-state
+                            (sk/initial-state (:id configuration)
+                                              (extract-ids configuration))))))
+
+(defn sk-state-watcher
+  [key watchee old-value new-value]
+  (log/info "Nothing to do atm" new-value))
+
 (defn -main
   [& args]
   (log/info "Starting node with configuration" args)
@@ -141,5 +172,7 @@
     (dosync
      (ref-set election-state
               (election/initial-state (:id conf) (extract-ids conf))))
+    (add-watch election-state :election election-state-watcher)
+    (add-watch sk-state :sk sk-state-watcher)
     (start-admin-server conf)
     (start-server-and-wait conf)))

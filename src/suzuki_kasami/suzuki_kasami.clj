@@ -77,7 +77,7 @@
    :queue ( (get-in msg ["value" "queue"]))})
 
 (defn initial-state-with-token
-  [sender nodes token]
+  [sender nodes]
   (assoc (initial-state sender nodes)
          :token (initial-token sender nodes)))
 
@@ -201,16 +201,17 @@
   [state request-msg]
   (fn [send-fn]
     (when (release-token-on-request? state request-msg)
-      (log/info "Releasing token on request")
+      (log/info "Releasing token on request" request-msg)
       (send-fn (sender-from-request request-msg)
-               (construct-token-msg (:sender state) (:token state))))))
+               (construct-token-msg :sender (:sender state)
+                                    :token (:token state))))))
 
 (defn handle-request
   [state msg]
   (log/info "Handle request" state msg)
   (let [new-state (update-request-number state msg)]
     {:state new-state
-     :action (maybe-release-token)}))
+     :action (maybe-release-token new-state msg)}))
 
 (defn handle-token
   [state msg]
@@ -226,4 +227,4 @@
 
 (defn handle-message
   [state msg]
-  (choose-handle-fn msg) state msg)
+  ((choose-handle-fn msg) state msg))
