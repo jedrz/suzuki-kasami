@@ -115,11 +115,12 @@
    :action (fn [_ &])})
 
 (declare request-number-from-state)
+(declare request-number-from-token)
 
 (defn request-number-from-state-to-token
   [state]
   (assoc-in state
-            [:token :last-requests state]
+            [:token :last-requests (:sender state)]
             (request-number-from-state state (:sender state))))
 
 (declare outstanding-request?)

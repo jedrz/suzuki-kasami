@@ -55,14 +55,10 @@
 
 (defn handle-sk
   [sk-fn]
-  (log/info "Handle sk")
   (let [action
         (dosync
-         (log/info "Handle sk before let")
          (let [{:keys [state action]} (sk-fn @sk-state)]
-           (log/info "Handle sk before ref-set")
            (ref-set sk-state state)
-           (log/info "New sk state before commit" state)
            action))]
     (log/info "New sk state" @sk-state)
     (action send-fn)))
@@ -84,7 +80,7 @@
 
 (defn modify-resource
   [value]
-  (log/info "Modifying resource with value" value)
+  (log/info "Request to modify resource with value" value)
   (reset! modify-resource-value value)
   (handle-sk sk/request-critical-section)
   {:status 200})
