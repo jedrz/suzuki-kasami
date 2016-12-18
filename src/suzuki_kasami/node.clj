@@ -177,10 +177,9 @@
 
 (defn sk-updated
   [state]
-  (when (and (contains? state :token)
-             (not (:critical-section? state))
+  (when (and (sk/can-execute-critical-section? state)
              (not (nil? @modify-resource-value)))
-    (log/info "Scheduling modify resource")
+    (log/info "Really start to modify resource")
     (handle-sk sk/enter-critical-section)
     (modify-external-resource @modify-resource-value)
     (reset! modify-resource-value nil)

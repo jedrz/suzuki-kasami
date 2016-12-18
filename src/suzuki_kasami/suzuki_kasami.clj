@@ -256,3 +256,16 @@
 (defn handle-message
   [state msg]
   ((choose-handle-fn msg) state msg))
+
+(defn has-token?
+  [state]
+  (contains? state :token))
+
+(defn in-critical-section?
+  [state]
+  (:critical-section? state))
+
+(defn can-execute-critical-section?
+  [state]
+  (and (has-token? state)
+       (not (in-critical-section? state))))
