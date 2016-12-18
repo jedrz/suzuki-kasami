@@ -146,11 +146,21 @@
              [:token :queue]
              #(into [] (rest %))))
 
-(defn release-token-after-cs
-  [token new-owner sender]
+(defn maybe-dissoc-token
+  [state new-owner]
+  (if (nil? new-owner)
+    state
+    (dissoc state :token)))
+
+(defn maybe-release-token-after-cs
+  [state new-owner]
   (fn [send-fn]
-    (send-fn new-owner
-             (construct-token-msg :sender sender :token token))))
+    (when-not (nil? new-owner)
+      (log/info "Releasing token after critical section to" new-owner)
+      (send-fn new-owner
+               (construct-token-msg
+                :sender (:sender state)
+                :token (:token state))))))
 
 (defn release-critical-section
   [state]
@@ -160,11 +170,9 @@
                       update-queue)
         new-token-owner (first-from-queue new-state)
         state-with-shorter-queue (drop-first-from-queue new-state)]
-    ;; TODO: dissoc only if should be.
-    {:state (dissoc state-with-shorter-queue :token)
-     :action (release-token-after-cs (:token state-with-shorter-queue)
-                                     new-token-owner
-                                     (:sender state))}))
+    {:state (maybe-dissoc-token state-with-shorter-queue new-token-owner)
+     :action (maybe-release-token-after-cs state-with-shorter-queue
+                                           new-token-owner)}))
 
 (defn update-request-number
   [state msg]
@@ -198,10 +206,15 @@
    (not (:critical-section? state))
    (outstanding-request? state (sender-from-request msg))))
 
+(defn maybe-dissoc-token-on-request
+  [state msg]
+  (if (release-token-on-request? state msg)
+    (dissoc state :token)
+    state))
+
 (defn maybe-release-token-on-request
   [state request-msg]
   (fn [send-fn]
-    (log/info "Ech")
     (when (release-token-on-request? state request-msg)
       (log/info "Releasing token on request" request-msg)
       (send-fn (sender-from-request request-msg)
@@ -212,18 +225,14 @@
   [state msg]
   (log/info "Handle request" state msg)
   (let [new-state (update-request-number state msg)]
-    (log/info "Handle request second log" new-state)
-    ;; TODO: dissoc token if should be.
-    {:state new-state
+    {:state (maybe-dissoc-token-on-request new-state msg)
      :action (maybe-release-token-on-request new-state msg)}))
 
 (defn handle-token
   [state msg]
   (log/info "Handle token" state msg)
-  (let [v {:state (assoc state :token (token-from-msg msg))
-           :action (fn [& _])}]
-    (log/info "Handle token returning map" v)
-    v))
+  {:state (assoc state :token (token-from-msg msg))
+   :action (fn [& _])})
 
 (defn choose-handle-fn
   [msg]
