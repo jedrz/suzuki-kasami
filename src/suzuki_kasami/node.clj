@@ -168,9 +168,9 @@
 (defn modify-external-resource
   [value]
   (log/info "Modifying external resource with value" value)
-  ;@(http/post "https://evening-peak-26255.herokuapp.com/"
-  ;            :body (str "{\"value\":" value "}"))
-  )
+  @(http/post "https://evening-peak-26255.herokuapp.com/"
+              {:body (str "{\"value\":" value "}")
+               :headers {:content-type "application/json"}}))
 
 (defn sk-state-watcher
   [key watchee old-value new-value]
