@@ -23,9 +23,11 @@
 
 (def configuration)
 
-(def election-state (ref {}))
+(def election-state (ref nil))
 
-(def sk-state (ref {}))
+(def sk-state (ref nil))
+
+(def modify-resource-value (atom nil))
 
 (defn create-client
   [id]
@@ -53,10 +55,14 @@
 
 (defn handle-sk
   [sk-fn]
+  (log/info "Handle sk")
   (let [action
         (dosync
+         (log/info "Handle sk before let")
          (let [{:keys [state action]} (sk-fn @sk-state)]
+           (log/info "Handle sk before ref-set")
            (ref-set sk-state state)
+           (log/info "New sk state before commit" state)
            action))]
     (log/info "New sk state" @sk-state)
     (action send-fn)))
@@ -79,6 +85,7 @@
 (defn modify-resource
   [value]
   (log/info "Modifying resource with value" value)
+  (reset! modify-resource-value value)
   (handle-sk sk/request-critical-section)
   {:status 200})
 
@@ -158,9 +165,30 @@
                             (sk/initial-state (:id configuration)
                                               (extract-ids configuration))))))
 
+(defn modify-external-resource
+  [value]
+  (log/info "Modifying external resource with value" value)
+  ;@(http/post "https://evening-peak-26255.herokuapp.com/"
+  ;            :body (str "{\"value\":" value "}"))
+  )
+
 (defn sk-state-watcher
   [key watchee old-value new-value]
-  (log/info "Nothing to do atm" new-value))
+  (log/info "Sk state wacher" old-value new-value)
+  (when (and (contains? new-value :token)
+             (not (:critical-section? new-value))
+             (not (nil? @modify-resource-value)))
+    (log/info "Scheduling modify resource")
+    (d/future
+      ;; Run in background thread not to nest transactions.
+      (log/info "Before marking critical section" watchee)
+      ;(dosync
+      ; (alter watchee assoc new-value :critical-section? true))
+      (modify-external-resource @modify-resource-value)
+      ;(dosync
+       ;; Revert critical section after modifying resource.
+       ;(ref-set watchee new-value))
+      (reset! modify-resource-value false))))
 
 (defn -main
   [& args]

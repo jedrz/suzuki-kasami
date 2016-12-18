@@ -74,7 +74,7 @@
 (defn token-from-msg
   [msg]
   {:last-requests (requests->unmessaged (get-in msg ["value" "lastRequests"]))
-   :queue ( (get-in msg ["value" "queue"]))})
+   :queue (into [] (get-in msg ["value" "queue"]))})
 
 (defn initial-state-with-token
   [sender nodes]
@@ -146,7 +146,7 @@
              [:token :queue]
              #(into [] (rest %))))
 
-(defn send-token
+(defn release-token-after-cs
   [token new-owner sender]
   (fn [send-fn]
     (send-fn new-owner
@@ -160,10 +160,11 @@
                       update-queue)
         new-token-owner (first-from-queue new-state)
         state-with-shorter-queue (drop-first-from-queue new-state)]
+    ;; TODO: dissoc only if should be.
     {:state (dissoc state-with-shorter-queue :token)
-     :action (send-token (:token state-with-shorter-queue)
-                         new-token-owner
-                         (:sender state))}))
+     :action (release-token-after-cs (:token state-with-shorter-queue)
+                                     new-token-owner
+                                     (:sender state))}))
 
 (defn update-request-number
   [state msg]
@@ -197,9 +198,10 @@
    (not (:critical-section? state))
    (outstanding-request? state (sender-from-request msg))))
 
-(defn maybe-release-token
+(defn maybe-release-token-on-request
   [state request-msg]
   (fn [send-fn]
+    (log/info "Ech")
     (when (release-token-on-request? state request-msg)
       (log/info "Releasing token on request" request-msg)
       (send-fn (sender-from-request request-msg)
@@ -210,14 +212,18 @@
   [state msg]
   (log/info "Handle request" state msg)
   (let [new-state (update-request-number state msg)]
+    (log/info "Handle request second log" new-state)
+    ;; TODO: dissoc token if should be.
     {:state new-state
-     :action (maybe-release-token new-state msg)}))
+     :action (maybe-release-token-on-request new-state msg)}))
 
 (defn handle-token
   [state msg]
   (log/info "Handle token" state msg)
-  {:state (assoc state :token (token-from-msg msg))
-   :action (fn [& _])})
+  (let [v {:state (assoc state :token (token-from-msg msg))
+           :action (fn [& _])}]
+    (log/info "Handle token returning map" v)
+    v))
 
 (defn choose-handle-fn
   [msg]
