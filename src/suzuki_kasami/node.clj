@@ -53,7 +53,7 @@
            (ref-set election-state state)
            action))]
     (log/info "New election state" @election-state)
-    (election-updated)
+    (d/future (election-updated @election-state))
     (action send-fn)))
 
 (declare sk-updated)
@@ -66,7 +66,7 @@
            (ref-set sk-state state)
            action))]
     (log/info "New sk state" @sk-state)
-    (sk-updated)
+    (d/future (sk-updated @sk-state))
     (action send-fn)))
 
 (defn handle-message
@@ -154,19 +154,19 @@
     (http/start-server admin-handler {:port port})))
 
 (defn election-updated
-  []
+  [state]
   (dosync
    (cond
      (election/elected?
-      @election-state) (ref-set
-                        sk-state
-                        (sk/initial-state-with-token (:id configuration)
-                                                     (extract-ids configuration)))
+      state) (ref-set
+              sk-state
+              (sk/initial-state-with-token (:id configuration)
+                                           (extract-ids configuration)))
      (election/finished?
-      @election-state) (ref-set
-                        sk-state
-                        (sk/initial-state (:id configuration)
-                                          (extract-ids configuration))))))
+      state) (ref-set
+              sk-state
+              (sk/initial-state (:id configuration)
+                                (extract-ids configuration))))))
 
 (defn modify-external-resource
   [value]
@@ -176,18 +176,16 @@
                :headers {:content-type "application/json"}}))
 
 (defn sk-updated
-  []
-  (when (and (contains? @sk-state :token)
-             (not (:critical-section? @sk-state))
+  [state]
+  (when (and (contains? state :token)
+             (not (:critical-section? state))
              (not (nil? @modify-resource-value)))
     (log/info "Scheduling modify resource")
-    (d/future
-      ;; Run in background thread not to nest transactions.
-      (handle-sk sk/enter-critical-section)
-      (modify-external-resource @modify-resource-value)
-      (handle-sk sk/release-critical-section)
-      (reset! modify-resource-value nil)
-      (log/info "Finished modifying resource"))))
+    (handle-sk sk/enter-critical-section)
+    (modify-external-resource @modify-resource-value)
+    (reset! modify-resource-value nil)
+    (handle-sk sk/release-critical-section)
+    (log/info "Finished modifying resource")))
 
 (defn -main
   [& args]
