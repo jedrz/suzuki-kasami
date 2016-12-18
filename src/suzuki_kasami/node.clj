@@ -159,10 +159,10 @@
                                     sk-state
                                     (sk/initial-state-with-token (:id configuration)
                                                                  (extract-ids configuration)))
-     (election/finished?) (ref-set
-                           sk-state
-                           (sk/initial-state (:id configuration)
-                                             (extract-ids configuration))))))
+     (election/finished? new-value) (ref-set
+                                     sk-state
+                                     (sk/initial-state (:id configuration)
+                                                       (extract-ids configuration))))))
 
 (defn modify-external-resource
   [value]
@@ -181,13 +181,11 @@
     (d/future
       ;; Run in background thread not to nest transactions.
       (log/info "Before marking critical section" watchee)
-      ;(dosync
-      ; (alter watchee assoc new-value :critical-section? true))
+      (handle-sk sk/enter-critical-section)
       (modify-external-resource @modify-resource-value)
-      ;(dosync
-       ;; Revert critical section after modifying resource.
-       ;(ref-set watchee new-value))
-      (reset! modify-resource-value false))))
+      (handle-sk sk/release-critical-section)
+      (reset! modify-resource-value false)
+      (log/info "Finished modifying resource"))))
 
 (defn -main
   [& args]

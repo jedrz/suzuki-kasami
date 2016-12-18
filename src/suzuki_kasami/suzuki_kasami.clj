@@ -107,6 +107,13 @@
     {:state new-state
      :action (send-request new-state)}))
 
+(defn enter-critical-section
+  [state]
+  (log/info "Enter critical section" state)
+  ;; Check if can be entered?
+  {:state (assoc state :critical-section? true)
+   :action (fn [_ &])})
+
 (declare request-number-from-state)
 
 (defn request-number-from-state-to-token
