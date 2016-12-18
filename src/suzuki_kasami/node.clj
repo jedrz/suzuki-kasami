@@ -43,6 +43,8 @@
       (s/put! s msg)
       (s/close! s))))
 
+(declare election-updated)
+
 (defn handle-election
   [election-fn]
   (let [action
@@ -51,7 +53,10 @@
            (ref-set election-state state)
            action))]
     (log/info "New election state" @election-state)
+    (election-updated)
     (action send-fn)))
+
+(declare sk-updated)
 
 (defn handle-sk
   [sk-fn]
@@ -61,6 +66,7 @@
            (ref-set sk-state state)
            action))]
     (log/info "New sk state" @sk-state)
+    (sk-updated)
     (action send-fn)))
 
 (defn handle-message
@@ -147,18 +153,20 @@
     (log/info "Starting admin server on port" port)
     (http/start-server admin-handler {:port port})))
 
-(defn election-state-watcher
-  [key watchee old-value new-value]
+(defn election-updated
+  []
   (dosync
    (cond
-     (election/elected? new-value) (ref-set
-                                    sk-state
-                                    (sk/initial-state-with-token (:id configuration)
-                                                                 (extract-ids configuration)))
-     (election/finished? new-value) (ref-set
-                                     sk-state
-                                     (sk/initial-state (:id configuration)
-                                                       (extract-ids configuration))))))
+     (election/elected?
+      @election-state) (ref-set
+                        sk-state
+                        (sk/initial-state-with-token (:id configuration)
+                                                     (extract-ids configuration)))
+     (election/finished?
+      @election-state) (ref-set
+                        sk-state
+                        (sk/initial-state (:id configuration)
+                                          (extract-ids configuration))))))
 
 (defn modify-external-resource
   [value]
@@ -167,16 +175,14 @@
               {:body (str "{\"value\":" value "}")
                :headers {:content-type "application/json"}}))
 
-(defn sk-state-watcher
-  [key watchee old-value new-value]
-  (log/info "Sk state wacher" old-value new-value)
-  (when (and (contains? new-value :token)
-             (not (:critical-section? new-value))
+(defn sk-updated
+  []
+  (when (and (contains? @sk-state :token)
+             (not (:critical-section? @sk-state))
              (not (nil? @modify-resource-value)))
     (log/info "Scheduling modify resource")
     (d/future
       ;; Run in background thread not to nest transactions.
-      (log/info "Before marking critical section" watchee)
       (handle-sk sk/enter-critical-section)
       (modify-external-resource @modify-resource-value)
       (handle-sk sk/release-critical-section)
@@ -193,7 +199,5 @@
     (dosync
      (ref-set election-state
               (election/initial-state (:id conf) (extract-ids conf))))
-    (add-watch election-state :election election-state-watcher)
-    (add-watch sk-state :sk sk-state-watcher)
     (start-admin-server conf)
     (start-server-and-wait conf)))
