@@ -119,7 +119,14 @@
             [:token :last-requests (:me state)]
             (me-request-number state)))
 
-(declare outstanding-request?)
+(defn outstanding-request?
+  ([state id]
+   (outstanding-request? (:requests state)
+                         (get-in state [:token :last-requests])
+                         id))
+  ([requests last-requests id]
+   (= (get requests id)
+      (inc (get last-requests id)))))
 
 (defn update-queue-itself
   [queue requests last-requests]
@@ -190,15 +197,6 @@
     (update-in state
                [:requests msg-sender]
                #(max % number-from-msg))))
-
-(defn outstanding-request?
-  ([state id]
-   (outstanding-request? (:requests state)
-                         (get-in state [:token :last-requests])
-                         id))
-  ([requests last-requests id]
-   (= (get requests id)
-      (inc (get last-requests id)))))
 
 (defn release-token-on-request?
   [state msg]

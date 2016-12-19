@@ -17,10 +17,6 @@
 
 (declare client)
 
-(defn extract-ids
-  [c]
-  (map :id (:nodes c)))
-
 (def configuration)
 
 (def election-state (ref nil))
@@ -43,31 +39,28 @@
       (s/put! s msg)
       (s/close! s))))
 
+(defn execute-process
+  [process-fn current-state listener]
+  (let [action
+        (dosync
+         (let [{:keys [state action]} (process-fn @current-state)]
+           (ref-set current-state state)
+           action))]
+    (log/info "New state" @current-state)
+    (d/future (listener @current-state))
+    (action send-fn)))
+
 (declare election-updated)
 
 (defn handle-election
   [election-fn]
-  (let [action
-        (dosync
-         (let [{:keys [state action]} (election-fn @election-state)]
-           (ref-set election-state state)
-           action))]
-    (log/info "New election state" @election-state)
-    (d/future (election-updated @election-state))
-    (action send-fn)))
+  (execute-process election-fn election-state election-updated))
 
 (declare sk-updated)
 
 (defn handle-sk
   [sk-fn]
-  (let [action
-        (dosync
-         (let [{:keys [state action]} (sk-fn @sk-state)]
-           (ref-set sk-state state)
-           action))]
-    (log/info "New sk state" @sk-state)
-    (d/future (sk-updated @sk-state))
-    (action send-fn)))
+  (execute-process sk-fn sk-state sk-updated))
 
 (defn handle-message
   [msg]
@@ -152,6 +145,10 @@
   (let [port (:admin-port configuration)]
     (log/info "Starting admin server on port" port)
     (http/start-server admin-handler {:port port})))
+
+(defn extract-ids
+  [configuration]
+  (map :id (:nodes configuration)))
 
 (defn election-updated
   [state]
