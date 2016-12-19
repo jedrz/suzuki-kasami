@@ -5,10 +5,10 @@
 (def ok-msg-type "electionOk")
 
 (defn construct-broadcast-msg
-  [& {:keys [sender node]}]
+  [& {:keys [sender]}]
   {"senderId" sender
    "type" broadcast-msg-type
-   "value" {"nodeId" node}})
+   "value" {"nodeId" sender}})
 
 (defn broadcast-msg?
   [msg]
@@ -28,10 +28,10 @@
   ((some-fn broadcast-msg? ok-msg?) msg))
 
 (defn initial-state
-  [sender nodes]
+  [me nodes]
   {:finished? false
    :elected? false
-   :sender sender
+   :me me
    :confirmations #{}
    :nodes (into #{} nodes)})
 
@@ -39,10 +39,9 @@
   [state]
   (fn [send-fn]
     (doseq [node (:nodes state)]
-      (let [sender (:sender state)]
-        ;; TODO: don't sent broadcast to confirmed nodes.
-        (send-fn node
-                 (construct-broadcast-msg :sender sender :node sender))))))
+      ;; TODO: don't sent broadcast to confirmed nodes.
+      (send-fn node
+               (construct-broadcast-msg :sender (:me state))))))
 
 (defn extract-sender
   [msg]
@@ -52,7 +51,7 @@
   [state msg]
   (fn [send-fn]
     (send-fn (extract-sender msg)
-             (construct-ok-msg :sender (:sender state)))))
+             (construct-ok-msg :sender (:me state)))))
 
 (defn start-election
   [state]
@@ -63,7 +62,7 @@
 (defn other-stronger?
   [state msg]
   (> (extract-sender msg)
-     (:sender state)))
+     (:me state)))
 
 (defn respond-ok
   [state msg]
