@@ -31,7 +31,7 @@
   (testing "initial state"
     (is (= (sut/initial-state 1 [2 3 4])
            {:critical-section? false
-            :sender 1
+            :me 1
             :nodes [2 3 4]
             :requests {1 0, 2 0, 3 0, 4 0}})))
 
@@ -45,15 +45,15 @@
           token (sut/initial-token 1 nodes)]
       (is (= (sut/initial-state-with-token 1 nodes)
              {:critical-section? false
-              :sender 1
+              :me 1
               :nodes nodes
               :requests {1 0, 2 0, 3 0, 4 0}
               :token token})))))
 
 (deftest protocol
-  (testing "incrementing sender's request number"
+  (testing "incrementing me request number"
     (let [state (sut/initial-state 2 [1 3 4])
-          inc3 (nth (iterate sut/inc-sender-request-number state) 2)]
+          inc3 (nth (iterate sut/inc-me-request-number state) 2)]
       ;; Increment second node.
       (is (= (get (:requests inc3) 2)
              2))
@@ -63,9 +63,9 @@
 
   (testing "getting sender's request number"
     (let [state (sut/initial-state 2 [1 3 4])
-          inc-state (sut/inc-sender-request-number
-                     (sut/inc-sender-request-number state))]
-      (is (= (sut/sender-request-number inc-state)
+          inc-state (sut/inc-me-request-number
+                     (sut/inc-me-request-number state))]
+      (is (= (sut/me-request-number inc-state)
              2))))
 
   (testing "updating request number from message"

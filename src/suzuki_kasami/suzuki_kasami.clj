@@ -46,21 +46,21 @@
   (->> (repeat (count nodes) 0)
        (zipmap nodes)))
 
-(defn conj-nodes-and-sender
-  [nodes sender]
+(defn conj-nodes-and-me
+  [nodes me]
   (sort
-   (conj nodes sender)))
+   (conj nodes me)))
 
 (defn initial-state
-  [sender nodes]
+  [me nodes]
   {:critical-section? false
-   :sender sender
+   :me me
    :nodes nodes
-   :requests (nodes->requests (conj-nodes-and-sender nodes sender))})
+   :requests (nodes->requests (conj-nodes-and-me nodes me))})
 
 (defn initial-token
-  [sender nodes]
-  {:last-requests (nodes->requests (conj-nodes-and-sender nodes sender))
+  [me nodes]
+  {:last-requests (nodes->requests (conj-nodes-and-me nodes me))
    :queue []})
 
 (defn requests->unmessaged
@@ -77,33 +77,32 @@
    :queue (into [] (get-in msg ["value" "queue"]))})
 
 (defn initial-state-with-token
-  [sender nodes]
-  (assoc (initial-state sender nodes)
-         :token (initial-token sender nodes)))
+  [me nodes]
+  (assoc (initial-state me nodes)
+         :token (initial-token me nodes)))
 
-(defn sender-request-number
+(defn me-request-number
   [state]
-  (get-in state [:requests (:sender state)]))
+  (get-in state [:requests (:me state)]))
 
 (defn send-request
   [state]
   (fn [send-fn]
     (doseq [node (:nodes state)]
-      (let [sender (:sender state)]
-        (send-fn node
-                 (construct-request-msg
-                  :sender sender
-                  :request-number (sender-request-number state)))))))
+      (send-fn node
+               (construct-request-msg
+                :sender (:me state)
+                :request-number (me-request-number state))))))
 
-(defn inc-sender-request-number
+(defn inc-me-request-number
   [state]
-  (let [sender (:sender state)]
+  (let [sender (:me state)]
     (update-in state [:requests sender] inc)))
 
 (defn request-critical-section
   [state]
   (log/info "Request critical section" state)
-  (let [new-state (inc-sender-request-number state)]
+  (let [new-state (inc-me-request-number state)]
     {:state new-state
      :action (send-request new-state)}))
 
@@ -114,14 +113,11 @@
   {:state (assoc state :critical-section? true)
    :action (fn [_ &])})
 
-(declare request-number-from-state)
-(declare request-number-from-token)
-
 (defn request-number-from-state-to-token
   [state]
   (assoc-in state
-            [:token :last-requests (:sender state)]
-            (request-number-from-state state (:sender state))))
+            [:token :last-requests (:me state)]
+            (me-request-number state)))
 
 (declare outstanding-request?)
 
@@ -171,7 +167,7 @@
       (log/info "Releasing token after critical section to" new-owner)
       (send-fn new-owner
                (construct-token-msg
-                :sender (:sender state)
+                :sender (:me state)
                 :token (:token state))))))
 
 (defn release-critical-section
@@ -194,14 +190,6 @@
     (update-in state
                [:requests msg-sender]
                #(max % number-from-msg))))
-
-(defn request-number-from-state
-  [state id]
-  (get-in state [:requests id]))
-
-(defn request-number-from-token
-  [token id]
-  (get-in token [:last-requests id]))
 
 (defn outstanding-request?
   ([state id]
@@ -231,7 +219,7 @@
     (when (release-token-on-request? state request-msg)
       (log/info "Releasing token on request" request-msg)
       (send-fn (sender-from-request request-msg)
-               (construct-token-msg :sender (:sender state)
+               (construct-token-msg :sender (:me state)
                                     :token (:token state))))))
 
 (defn handle-request
