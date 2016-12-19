@@ -43,7 +43,7 @@
   (testing "initial state with token"
     (let [nodes [2 3 4]
           token (sut/initial-token 1 nodes)]
-      (is (= (sut/initial-state-with-token 1 nodes token)
+      (is (= (sut/initial-state-with-token 1 nodes)
              {:critical-section? false
               :sender 1
               :nodes nodes
