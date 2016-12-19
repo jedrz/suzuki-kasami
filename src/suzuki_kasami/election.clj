@@ -35,11 +35,15 @@
    :confirmations #{}
    :nodes (into #{} nodes)})
 
+(defn not-confirmed
+  [state]
+  (filter (complement (:confirmations state))
+          (:nodes state)))
+
 (defn send-broadcast
   [state]
   (fn [send-fn]
-    (doseq [node (:nodes state)]
-      ;; TODO: don't sent broadcast to confirmed nodes.
+    (doseq [node (not-confirmed state)]
       (send-fn node
                (construct-broadcast-msg :sender (:me state))))))
 

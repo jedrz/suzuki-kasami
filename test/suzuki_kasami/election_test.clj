@@ -26,3 +26,17 @@
       (is (= (sut/choose-handle-fn msg)
              sut/handle-ok)))))
 
+(deftest helpers
+
+  (testing "not-confirmed"
+    (let [state {:confirmations #{} :nodes #{1 2 3}}]
+      (is (= (into #{} (sut/not-confirmed state))
+             #{1 2 3})))
+
+    (let [state {:confirmations #{2} :nodes #{1 2 3}}]
+      (is (= (into #{} (sut/not-confirmed state))
+             #{1 3})))
+
+    (let [state {:confirmations #{1 2 3} :nodes #{1 2 3}}]
+      (is (= (into #{} (sut/not-confirmed state))
+             #{})))))
