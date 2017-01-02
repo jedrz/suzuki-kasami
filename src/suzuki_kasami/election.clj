@@ -2,7 +2,7 @@
   (:require [taoensso.timbre :as log]))
 
 (def broadcast-msg-type "electionBroadcast")
-(def ok-msg-type "electionOk")
+(def ok-msg-type "electionOK")
 
 (defn construct-broadcast-msg
   [& {:keys [sender]}]

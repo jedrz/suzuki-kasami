@@ -12,7 +12,7 @@
   (testing "constructing ok message"
     (is (= (sut/construct-ok-msg :sender 5)
            {"senderId" 5
-            "type" "electionOk"}))))
+            "type" "electionOK"}))))
 
 (deftest handle-msg
 
