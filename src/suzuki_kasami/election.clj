@@ -3,6 +3,7 @@
 
 (def broadcast-msg-type "electionBroadcast")
 (def ok-msg-type "electionOK")
+(def elect-broadcast-msg-type "electBroadcast")
 
 (defn construct-broadcast-msg
   [& {:keys [sender]}]
@@ -22,6 +23,12 @@
 (defn ok-msg?
   [msg]
   (= (get msg "type") ok-msg-type))
+
+(defn construct-elect-broadcast-msg
+  [& {:keys [sender]}]
+  {"senderId" sender
+   "type" elect-broadcast-msg-type
+   "value" {"electNodeId" sender}})
 
 (defn election-msg?
   [msg]
@@ -93,6 +100,15 @@
          :elected? (= (:confirmations state) (:nodes state))
          :finished? true))
 
+(defn maybe-send-elect-broadcast
+  [state]
+  (fn [send-fn]
+    (when (:elected? state)
+      (log/info "Sending electBroadcast to all nodes")
+      (doseq [node (:nodes state)]
+        (send-fn node
+                 (construct-elect-broadcast-msg :sender (:me state)))))))
+
 (defn handle-ok
   [state msg]
   (log/info "Handle ok" state msg)
@@ -100,7 +116,7 @@
                       (extend-confirmations msg)
                       (update-elected msg))]
     {:state new-state
-     :action (fn [& _])}))
+     :action (maybe-send-elect-broadcast new-state)}))
 
 (defn choose-handle-fn
   [msg]
