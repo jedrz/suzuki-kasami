@@ -38,6 +38,7 @@
   [me nodes]
   {:finished? false
    :elected? false
+   :electBroadcastSent? false
    :me me
    :confirmations #{}
    :nodes (into #{} nodes)})
@@ -103,7 +104,8 @@
 (defn maybe-send-elect-broadcast
   [state]
   (fn [send-fn]
-    (when (:elected? state)
+    (when (and (:elected? state)
+               (not (:electBroadcastSent? state)))
       (log/info "Sending electBroadcast to all nodes")
       (doseq [node (:nodes state)]
         (send-fn node
@@ -115,7 +117,7 @@
   (let [new-state (-> state
                       (extend-confirmations msg)
                       (update-elected msg))]
-    {:state new-state
+    {:state (assoc new-state :electBroadcastSent? (:elected? new-state))
      :action (maybe-send-elect-broadcast new-state)}))
 
 (defn choose-handle-fn
