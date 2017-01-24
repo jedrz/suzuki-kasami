@@ -165,10 +165,16 @@
               (sk/initial-state (:me configuration)
                                 (extract-ids configuration))))))
 
+(defn get-resource-server-url
+  []
+  (get-in configuration
+          [:resource-server :url]
+          "https://evening-peak-26255.herokuapp.com/"))
+
 (defn modify-external-resource
   [value]
   (log/info "Modifying external resource with value" value)
-  @(http/post "https://evening-peak-26255.herokuapp.com/"
+  @(http/post (get-resource-server-url)
               {:body (str "{\"value\":" value "}")
                :headers {:content-type "application/json"}}))
 
