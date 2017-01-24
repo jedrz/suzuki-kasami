@@ -99,19 +99,31 @@
   (let [sender (:me state)]
     (update-in state [:requests sender] inc)))
 
+(declare has-token?)
+
 (defn request-critical-section
   [state]
   (log/info "Request critical section" state)
-  (let [new-state (inc-me-request-number state)]
-    {:state new-state
-     :action (send-request new-state)}))
+  (if (has-token? state)
+    (do
+      (log/info "Has token already. Nothing to do")
+      {:state state
+       :action (fn [_ &])})
+    (do
+      (log/info "Request critical section because no token")
+      (let [new-state (inc-me-request-number state)]
+        {:state new-state
+         :action (send-request new-state)}))))
+
+(declare can-execute-critical-section?)
 
 (defn enter-critical-section
   [state]
   (log/info "Enter critical section" state)
-  ;; Check if can be entered?
-  {:state (assoc state :critical-section? true)
-   :action (fn [_ &])})
+  (if (can-execute-critical-section? state)
+    {:state (assoc state :critical-section? true)
+     :action (fn [_ &])}
+    (throw (ex-info "Cannot enter critical section" {:state state}))))
 
 (defn request-number-from-state-to-token
   [state]
